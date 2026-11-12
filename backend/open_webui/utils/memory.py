@@ -364,14 +364,22 @@ async def recall_memories(request, messages: list[dict], user, model: dict | Non
             label = f'{metadata.get("path")}: {content}' if metadata.get('path') else content
             sections[Memories.normalize_memory_type(metadata.get('type'))].append(label)
 
+    already_sent = '\n'.join(
+        message['content']
+        for message in messages
+        if message.get('role') == 'tool'
+        and isinstance(message.get('content'), str)
+        and message['content'].startswith(MEMORY_CONTEXT_OPEN)
+    )
     parts = []
     for title, key in (
         ('User Memory', 'user'),
         ('Memory Neighborhood', 'neighborhood'),
         ('Relevant Context', 'context'),
     ):
-        if sections[key]:
-            ordered = sorted(sections[key], key=lambda memory: (memory.casefold(), memory))
+        new_memories = [memory for memory in sections[key] if f'- {memory}\n' not in already_sent]
+        if new_memories:
+            ordered = sorted(new_memories, key=lambda memory: (memory.casefold(), memory))
             parts.append(f'[{title}]\n' + '\n'.join(f'- {memory}' for memory in ordered))
     if not parts:
         return ''
